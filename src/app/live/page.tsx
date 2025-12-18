@@ -331,17 +331,6 @@ function LivePageClient() {
       // 不设置错误，而是显示空状态
       setLiveSources([]);
       setLoading(false);
-    } finally {
-      // 移除 URL 搜索参数中的 source 和 id
-      const newSearchParams = new URLSearchParams(searchParams.toString());
-      newSearchParams.delete('source');
-      newSearchParams.delete('id');
-
-      const newUrl = newSearchParams.toString()
-        ? `?${newSearchParams.toString()}`
-        : window.location.pathname;
-
-      router.replace(newUrl);
     }
   };
 
@@ -445,6 +434,14 @@ function LivePageClient() {
           } catch (err) {
             console.error('保存播放记录失败:', err);
           }
+
+          // 更新URL参数
+          const newSearchParams = new URLSearchParams(searchParams.toString());
+          newSearchParams.set('source', source.key);
+          newSearchParams.set('id', selectedChannel.id);
+
+          const newUrl = `?${newSearchParams.toString()}`;
+          router.replace(newUrl);
         }
       }
 
@@ -527,6 +524,14 @@ function LivePageClient() {
 
       setCurrentSource(source);
       await fetchChannels(source);
+
+      // 更新URL参数 - 切换直播源时清除频道id，因为新的直播源会有不同的频道列表
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      newSearchParams.set('source', source.key);
+      newSearchParams.delete('id'); // 清除频道id
+
+      const newUrl = `?${newSearchParams.toString()}`;
+      router.replace(newUrl);
     } catch (err) {
       console.error('切换直播源失败:', err);
       // 不设置错误，保持当前状态
@@ -580,6 +585,16 @@ function LivePageClient() {
 
     setCurrentChannel(channel);
     setVideoUrl(channel.url);
+
+    // 更新URL参数
+    if (currentSource) {
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      newSearchParams.set('source', currentSource.key);
+      newSearchParams.set('id', channel.id);
+
+      const newUrl = `?${newSearchParams.toString()}`;
+      router.replace(newUrl);
+    }
 
     // 自动滚动到选中的频道位置
     setTimeout(() => {
