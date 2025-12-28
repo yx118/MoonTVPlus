@@ -64,6 +64,15 @@ export default async function RootLayout({
   let recommendationDataSource = 'Mixed';
   let tmdbApiKey = '';
   let openListEnabled = false;
+  let loginBackgroundImage = '';
+  let registerBackgroundImage = '';
+  let enableRegistration = false;
+  let loginRequireTurnstile = false;
+  let registrationRequireTurnstile = false;
+  let turnstileSiteKey = '';
+  let enableOIDCLogin = false;
+  let enableOIDCRegistration = false;
+  let oidcButtonText = '';
   let customCategories = [] as {
     name: string;
     type: 'movie' | 'tv';
@@ -90,6 +99,15 @@ export default async function RootLayout({
     enableComments = config.SiteConfig.EnableComments;
     recommendationDataSource = config.SiteConfig.RecommendationDataSource || 'Mixed';
     tmdbApiKey = config.SiteConfig.TMDBApiKey || '';
+    loginBackgroundImage = config.ThemeConfig?.loginBackgroundImage || '';
+    registerBackgroundImage = config.ThemeConfig?.registerBackgroundImage || '';
+    enableRegistration = config.SiteConfig.EnableRegistration || false;
+    loginRequireTurnstile = config.SiteConfig.LoginRequireTurnstile || false;
+    registrationRequireTurnstile = config.SiteConfig.RegistrationRequireTurnstile || false;
+    turnstileSiteKey = config.SiteConfig.TurnstileSiteKey || '';
+    enableOIDCLogin = config.SiteConfig.EnableOIDCLogin || false;
+    enableOIDCRegistration = config.SiteConfig.EnableOIDCRegistration || false;
+    oidcButtonText = config.SiteConfig.OIDCButtonText || '';
     // 检查是否启用了 OpenList 功能
     openListEnabled = !!(
       config.OpenListConfig?.Enabled &&
@@ -115,6 +133,15 @@ export default async function RootLayout({
     ENABLE_OFFLINE_DOWNLOAD: process.env.NEXT_PUBLIC_ENABLE_OFFLINE_DOWNLOAD === 'true',
     VOICE_CHAT_STRATEGY: process.env.NEXT_PUBLIC_VOICE_CHAT_STRATEGY || 'webrtc-fallback',
     OPENLIST_ENABLED: openListEnabled,
+    LOGIN_BACKGROUND_IMAGE: loginBackgroundImage,
+    REGISTER_BACKGROUND_IMAGE: registerBackgroundImage,
+    ENABLE_REGISTRATION: enableRegistration,
+    LOGIN_REQUIRE_TURNSTILE: loginRequireTurnstile,
+    REGISTRATION_REQUIRE_TURNSTILE: registrationRequireTurnstile,
+    TURNSTILE_SITE_KEY: turnstileSiteKey,
+    ENABLE_OIDC_LOGIN: enableOIDCLogin,
+    ENABLE_OIDC_REGISTRATION: enableOIDCRegistration,
+    OIDC_BUTTON_TEXT: oidcButtonText,
   };
 
   return (

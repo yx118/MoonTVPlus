@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
     EnableOIDCLogin: config.SiteConfig.EnableOIDCLogin || false,
     EnableOIDCRegistration: config.SiteConfig.EnableOIDCRegistration || false,
     OIDCButtonText: config.SiteConfig.OIDCButtonText || '',
+    loginBackgroundImage: config.ThemeConfig?.loginBackgroundImage || '',
+    registerBackgroundImage: config.ThemeConfig?.registerBackgroundImage || '',
   };
   return NextResponse.json(result);
 }

@@ -97,6 +97,8 @@ export interface AdminConfig {
     enableCache: boolean; // 是否启用浏览器缓存
     cacheMinutes: number; // 缓存时间（分钟）
     cacheVersion: number; // CSS版本号（用于缓存控制）
+    loginBackgroundImage?: string; // 登录界面背景图
+    registerBackgroundImage?: string; // 注册界面背景图
   };
   OpenListConfig?: {
     Enabled: boolean; // 是否启用私人影库功能

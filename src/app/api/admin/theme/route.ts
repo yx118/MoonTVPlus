@@ -34,12 +34,16 @@ export async function POST(request: NextRequest) {
       customCSS,
       enableCache,
       cacheMinutes,
+      loginBackgroundImage,
+      registerBackgroundImage,
     } = body as {
       enableBuiltInTheme: boolean;
       builtInTheme: string;
       customCSS: string;
       enableCache: boolean;
       cacheMinutes: number;
+      loginBackgroundImage?: string;
+      registerBackgroundImage?: string;
     };
 
     // 参数校验
@@ -51,6 +55,39 @@ export async function POST(request: NextRequest) {
       typeof cacheMinutes !== 'number'
     ) {
       return NextResponse.json({ error: '参数格式错误' }, { status: 400 });
+    }
+
+    // 验证背景图URL格式（支持多行，每行一个URL）
+    if (loginBackgroundImage && loginBackgroundImage.trim() !== '') {
+      const urls = loginBackgroundImage
+        .split('\n')
+        .map((url) => url.trim())
+        .filter((url) => url !== '');
+
+      for (const url of urls) {
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          return NextResponse.json(
+            { error: `登录界面背景图URL格式错误：${url}，每个URL必须以http://或https://开头` },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    if (registerBackgroundImage && registerBackgroundImage.trim() !== '') {
+      const urls = registerBackgroundImage
+        .split('\n')
+        .map((url) => url.trim())
+        .filter((url) => url !== '');
+
+      for (const url of urls) {
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          return NextResponse.json(
+            { error: `注册界面背景图URL格式错误：${url}，每个URL必须以http://或https://开头` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const adminConfig = await getConfig();
@@ -82,6 +119,8 @@ export async function POST(request: NextRequest) {
       enableCache,
       cacheMinutes,
       cacheVersion: cssChanged ? currentVersion + 1 : currentVersion,
+      loginBackgroundImage: loginBackgroundImage?.trim() || undefined,
+      registerBackgroundImage: registerBackgroundImage?.trim() || undefined,
     };
 
     // 写入数据库
