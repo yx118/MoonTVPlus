@@ -121,7 +121,12 @@ function transformToSSE(
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
-              const data = line.slice(6);
+              const data = line.slice(6).trim();
+
+              // 跳过空数据
+              if (!data) {
+                continue;
+              }
 
               if (data === '[DONE]') {
                 controller.enqueue(
@@ -151,7 +156,10 @@ function transformToSSE(
                   );
                 }
               } catch (e) {
-                console.error('Parse stream chunk error:', e);
+                // 只在非空数据解析失败时打印错误
+                if (data.length > 0) {
+                  console.error('Parse stream chunk error:', e, 'Data:', data.substring(0, 100));
+                }
               }
             }
           }
@@ -228,6 +236,9 @@ export async function POST(request: NextRequest) {
         tavilyApiKey: aiConfig.TavilyApiKey,
         serperApiKey: aiConfig.SerperApiKey,
         serpApiKey: aiConfig.SerpApiKey,
+        // TMDB 配置
+        tmdbApiKey: adminConfig.SiteConfig.TMDBApiKey,
+        tmdbProxy: adminConfig.SiteConfig.TMDBProxy,
         // 决策模型配置（固定使用自定义provider，复用主模型的API配置）
         enableDecisionModel: aiConfig.EnableDecisionModel,
         decisionProvider: 'custom',

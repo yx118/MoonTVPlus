@@ -4,6 +4,9 @@
  * 负责协调AI与联网搜索、豆瓣API、TMDB API之间的数据交互
  */
 
+import { fetchDoubanData as fetchDoubanAPI } from '@/lib/douban';
+import { searchTMDB, getTVSeasons } from '@/lib/tmdb.search';
+
 export interface VideoContext {
   title?: string;
   year?: string;
@@ -87,15 +90,13 @@ export function analyzeIntent(
   else if (isPerson || hasTimeKeyword) type = 'query';
 
   // 决定是否需要各个数据源
-  // 联网搜索: 对于推荐、查询、时效性问题、演员信息等都应该启用
-  // 当用户在观看视频时提问(有context),默认也应该联网以获取最新信息
+  // 联网搜索: 只在真正需要实时信息时启用
   const needWebSearch =
     hasTimeKeyword ||
     isPerson ||
     message.includes('新闻') ||
-    isRecommendation ||
-    type === 'query' ||
-    (context?.title !== undefined); // 有上下文时默认联网
+    (isRecommendation && hasTimeKeyword) || // 推荐+时效性
+    type === 'query';
   const needDouban =
     isRecommendation ||
     type === 'detail' ||
@@ -197,6 +198,7 @@ async function fetchWebSearch(
 
 /**
  * 获取豆瓣数据
+ * 服务器端直接调用豆瓣API
  */
 async function fetchDoubanData(params: {
   id?: number;
@@ -206,66 +208,86 @@ async function fetchDoubanData(params: {
   type?: string;
 }): Promise<any> {
   try {
+    // 1. 通过 ID 获取详情
     if (params.id) {
-      // 获取详情
-      const response = await fetch(`/api/douban/detail?id=${params.id}`);
-      if (response.ok) {
-        return await response.json();
-      }
-    } else if (params.query) {
-      // 搜索
-      const response = await fetch('/api/douban/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: params.query,
-          type: params.kind || 'movie',
-        }),
-      });
-      if (response.ok) {
-        return await response.json();
-      }
-    } else if (params.kind && params.category) {
-      // 分类列表
-      const response = await fetch('/api/douban/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kind: params.kind,
-          category: params.category,
-          type: params.type || '全部',
-        }),
-      });
-      if (response.ok) {
-        return await response.json();
-      }
+      const url = `https://m.douban.com/rexxar/api/v2/subject/${params.id}`;
+      console.log('📡 获取豆瓣详情:', params.id);
+      return await fetchDoubanAPI(url);
     }
+
+    // 2. 通过分类获取热门列表
+    if (params.kind && params.category && params.type) {
+      const url = `https://m.douban.com/rexxar/api/v2/subject/recent_hot/${params.kind}?start=0&limit=20&category=${encodeURIComponent(params.category)}&type=${encodeURIComponent(params.type)}`;
+      console.log('📡 获取豆瓣分类:', params.kind, params.category, params.type);
+      return await fetchDoubanAPI(url);
+    }
+
+    // 3. 通过搜索查询
+    if (params.query) {
+      const kind = params.kind || 'movie';
+      const url = `https://movie.douban.com/j/search_subjects?type=${kind}&tag=${encodeURIComponent(params.query)}&sort=recommend&page_limit=20&page_start=0`;
+      console.log('📡 搜索豆瓣:', params.query, kind);
+      return await fetchDoubanAPI(url);
+    }
+
+    console.log('⚠️ 豆瓣数据获取参数不完整:', params);
+    return null;
   } catch (error) {
-    console.error('Douban API error:', error);
+    console.error('❌ 豆瓣数据获取失败:', error);
+    return null;
   }
-  return null;
 }
 
 /**
  * 获取TMDB数据
+ * 服务器端直接调用TMDB API
  */
-async function fetchTMDBData(params: {
-  id?: number;
-  type?: 'movie' | 'tv';
-}): Promise<any> {
+async function fetchTMDBData(
+  params: {
+    id?: number;
+    type?: 'movie' | 'tv';
+  },
+  tmdbApiKey?: string,
+  tmdbProxy?: string
+): Promise<any> {
   try {
-    if (params.id && params.type) {
-      const response = await fetch(
-        `/api/tmdb/detail?id=${params.id}&type=${params.type}`
-      );
-      if (response.ok) {
-        return await response.json();
-      }
+    if (!tmdbApiKey) {
+      console.log('⚠️ TMDB API Key 未配置，跳过TMDB数据获取');
+      return null;
     }
+
+    if (!params.id || !params.type) {
+      console.log('⚠️ TMDB数据获取参数不完整:', params);
+      return null;
+    }
+
+    // 使用 TMDB API 获取详情
+    // TMDB API: https://api.themoviedb.org/3/{type}/{id}
+    const url = `https://api.themoviedb.org/3/${params.type}/${params.id}?api_key=${tmdbApiKey}&language=zh-CN&append_to_response=keywords,similar`;
+
+    console.log('📡 获取TMDB详情:', params.type, params.id);
+
+    const fetchOptions: any = tmdbProxy
+      ? {
+          // 如果有代理，使用 node-fetch 和代理
+          signal: AbortSignal.timeout(15000),
+        }
+      : {
+          signal: AbortSignal.timeout(15000),
+        };
+
+    const response = await fetch(url, fetchOptions);
+
+    if (!response.ok) {
+      console.error('❌ TMDB API 请求失败:', response.status, response.statusText);
+      return null;
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('TMDB API error:', error);
+    console.error('❌ TMDB数据获取失败:', error);
+    return null;
   }
-  return null;
 }
 
 /**
@@ -317,6 +339,22 @@ function formatSearchResults(
 }
 
 /**
+ * 清理可能被代码块包裹的JSON字符串
+ */
+function cleanJsonResponse(content: string): string {
+  // 去除可能的markdown代码块标记
+  let cleaned = content.trim();
+
+  // 移除 ```json 或 ``` 开头
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '');
+
+  // 移除 ``` 结尾
+  cleaned = cleaned.replace(/\n?```\s*$/, '');
+
+  return cleaned.trim();
+}
+
+/**
  * 使用决策模型判断是否需要调用各个数据源
  */
 async function callDecisionModel(
@@ -327,31 +365,50 @@ async function callDecisionModel(
     apiKey: string;
     baseURL?: string;
     model: string;
+  },
+  availableDataSources: {
+    webSearch: boolean;
+    douban: boolean;
+    tmdb: boolean;
   }
 ): Promise<DecisionResult> {
+  // 构建可用数据源列表
+  const availableSources: string[] = [];
+  if (availableDataSources.webSearch) {
+    availableSources.push('1. **联网搜索** - 获取最新的实时信息（新闻、上映时间、续集信息等）');
+  }
+  if (availableDataSources.douban) {
+    availableSources.push('2. **豆瓣API** - 获取中文影视数据（评分、演员、简介、用户评论等）');
+  }
+  if (availableDataSources.tmdb) {
+    availableSources.push('3. **TMDB API** - 获取国际影视数据（详细元数据、相似推荐等）');
+  }
+
   const systemPrompt = `你是一个影视问答决策系统。请分析用户的问题，判断需要调用哪些数据源来回答。
 
-可用的数据源：
-1. **联网搜索** - 获取最新的实时信息（新闻、上映时间、续集信息等）
-2. **豆瓣API** - 获取中文影视数据（评分、演员、简介、用户评论等）
-3. **TMDB API** - 获取国际影视数据（详细元数据、相似推荐等）
+当前可用的数据源：
+${availableSources.join('\n')}
+${availableSources.length === 0 ? '⚠️ 没有可用的数据源，请返回所有字段为false' : ''}
 
 请以JSON格式返回决策结果，包含以下字段：
 {
-  "needWebSearch": boolean,  // 是否需要联网搜索
-  "needDouban": boolean,     // 是否需要豆瓣数据
-  "needTMDB": boolean,       // 是否需要TMDB数据
+  "needWebSearch": boolean,  // 是否需要联网搜索${!availableDataSources.webSearch ? ' (当前不可用，必须返回false)' : ''}
+  "needDouban": boolean,     // 是否需要豆瓣数据${!availableDataSources.douban ? ' (当前不可用，必须返回false)' : ''}
+  "needTMDB": boolean,       // 是否需要TMDB数据${!availableDataSources.tmdb ? ' (当前不可用，必须返回false)' : ''}
   "webSearchQuery": string,  // 如果需要联网，用什么关键词搜索（可选）
   "doubanQuery": string,     // 如果需要豆瓣，用什么关键词搜索（可选）
   "reasoning": string        // 简要说明决策理由
 }
 
 决策原则：
-- 时效性问题（最新、上映时间、续集、播出等）→ 需要联网搜索
-- 推荐类问题 → 优先豆瓣
-- 剧情、演员、评分等静态信息 → 豆瓣或TMDB
-- 当前视频的详细信息 → 豆瓣+TMDB
-- 有疑问时倾向于多调用数据源
+- **只能选择当前可用的数据源，不可用的数据源必须返回false**
+- **优先使用最少的数据源来满足需求，避免不必要的API调用**
+- 时效性问题（最新、上映时间、续集、播出、更新等）→ 需要联网搜索${!availableDataSources.webSearch ? '（但当前不可用）' : ''}
+- 演员/导演相关问题 → 优先豆瓣，如果问"最近作品"则额外联网
+- 推荐类问题 → 仅豆瓣（如果包含"最新""今年"等时效性关键词则额外联网）
+- 剧情、评分等静态信息 → 仅豆瓣或TMDB，不需要联网
+- 当前视频的详细信息（有视频上下文） → 豆瓣+TMDB，通常不需要联网
+- 新闻、热点、讨论等 → 需要联网搜索${!availableDataSources.webSearch ? '（但当前不可用）' : ''}
 
 只返回JSON，不要其他内容。`;
 
@@ -392,8 +449,11 @@ async function callDecisionModel(
       const data = await response.json();
       const content = data.content?.[0]?.text || '';
 
+      // 清理可能的代码块标记
+      const cleanedContent = cleanJsonResponse(content);
+
       // 提取JSON
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
@@ -424,19 +484,20 @@ async function callDecisionModel(
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '{}';
-      return JSON.parse(content);
+
+      // 清理可能的代码块标记
+      const cleanedContent = cleanJsonResponse(content);
+
+      return JSON.parse(cleanedContent);
     }
   } catch (error) {
     console.error('❌ 决策模型调用失败:', error);
+    // 失败时返回null，由调用方降级到传统意图分析
+    return null as any;
   }
 
-  // 失败时返回默认决策（保守策略：都调用）
-  return {
-    needWebSearch: true,
-    needDouban: true,
-    needTMDB: context?.tmdb_id !== undefined,
-    reasoning: '决策模型调用失败，使用默认策略',
-  };
+  // 不应该到达这里
+  return null as any;
 }
 
 /**
@@ -451,6 +512,9 @@ export async function orchestrateDataSources(
     tavilyApiKey?: string;
     serperApiKey?: string;
     serpApiKey?: string;
+    // TMDB 配置
+    tmdbApiKey?: string;
+    tmdbProxy?: string;
     // 决策模型配置
     enableDecisionModel?: boolean;
     decisionProvider?: 'openai' | 'claude' | 'custom';
@@ -462,31 +526,64 @@ export async function orchestrateDataSources(
   let intent: IntentAnalysisResult;
 
   // 1. 使用决策模型或传统意图分析
+  let decision: DecisionResult | null = null;
   if (config?.enableDecisionModel && config.decisionProvider && config.decisionApiKey && config.decisionModel) {
     console.log('🤖 使用决策模型分析...');
 
-    const decision = await callDecisionModel(userMessage, context, {
-      provider: config.decisionProvider,
-      apiKey: config.decisionApiKey,
-      baseURL: config.decisionBaseURL,
-      model: config.decisionModel,
-    });
+    // 确定哪些数据源是可用的
+    const hasWebSearchProvider = !!(config.enableWebSearch &&
+      config.webSearchProvider &&
+      (
+        (config.webSearchProvider === 'tavily' && config.tavilyApiKey) ||
+        (config.webSearchProvider === 'serper' && config.serperApiKey) ||
+        (config.webSearchProvider === 'serpapi' && config.serpApiKey)
+      ));
+
+    const hasTMDB = !!(config.tmdbApiKey);
+
+    decision = await callDecisionModel(
+      userMessage,
+      context,
+      {
+        provider: config.decisionProvider,
+        apiKey: config.decisionApiKey,
+        baseURL: config.decisionBaseURL,
+        model: config.decisionModel,
+      },
+      {
+        webSearch: hasWebSearchProvider,
+        douban: true, // 豆瓣始终可用（服务器端直接调用）
+        tmdb: hasTMDB,
+      }
+    );
 
     console.log('🎯 决策模型结果:', decision);
+  }
 
+  // 如果决策模型失败或未启用，降级到传统意图分析
+  if (!decision) {
+    if (config?.enableDecisionModel) {
+      console.log('⚠️ 决策模型失败，降级到传统意图分析');
+    }
+    // 传统关键词匹配分析
+    intent = analyzeIntent(userMessage, context);
+    console.log('📊 意图分析结果:', intent);
+  } else {
     // 将决策结果转换为 IntentAnalysisResult 格式
+    // 保留决策模型的查询优化
     intent = {
-      type: decision.needDouban ? 'detail' : 'general',
+      type: decision.needDouban && !decision.needWebSearch ? 'detail' :
+            decision.needWebSearch ? 'query' : 'general',
       needWebSearch: decision.needWebSearch,
       needDouban: decision.needDouban,
       needTMDB: decision.needTMDB,
       keywords: decision.webSearchQuery ? [decision.webSearchQuery] : [],
       entities: [],
+      mediaType: context?.type,
     };
-  } else {
-    // 传统关键词匹配分析
-    intent = analyzeIntent(userMessage, context);
-    console.log('📊 意图分析结果:', intent);
+    // 保存优化的查询字符串
+    (intent as any).optimizedWebSearchQuery = decision.webSearchQuery;
+    (intent as any).optimizedDoubanQuery = decision.doubanQuery;
   }
 
   // 2. 并行获取所需的数据源
@@ -511,7 +608,9 @@ export async function orchestrateDataSources(
           : config.serpApiKey;
 
     if (apiKey) {
-      webSearchPromise = fetchWebSearch(userMessage, provider, apiKey);
+      // 使用决策模型优化的查询，如果没有则使用原始消息
+      const searchQuery = (intent as any).optimizedWebSearchQuery || userMessage;
+      webSearchPromise = fetchWebSearch(searchQuery, provider, apiKey);
       dataPromises.push(webSearchPromise);
     }
   }
@@ -525,6 +624,12 @@ export async function orchestrateDataSources(
         kind: intent.mediaType || 'movie',
         category: '热门',
         type: intent.genre || '全部',
+      });
+    } else if ((intent as any).optimizedDoubanQuery) {
+      // 使用决策模型优化的豆瓣查询
+      doubanPromise = fetchDoubanData({
+        query: (intent as any).optimizedDoubanQuery,
+        kind: intent.mediaType || context?.type,
       });
     } else if (context?.title) {
       doubanPromise = fetchDoubanData({
@@ -540,10 +645,14 @@ export async function orchestrateDataSources(
 
   // TMDB数据
   if (intent.needTMDB && context?.tmdb_id && context?.type) {
-    tmdbPromise = fetchTMDBData({
-      id: context.tmdb_id,
-      type: context.type,
-    });
+    tmdbPromise = fetchTMDBData(
+      {
+        id: context.tmdb_id,
+        type: context.type,
+      },
+      config?.tmdbApiKey,
+      config?.tmdbProxy
+    );
     dataPromises.push(tmdbPromise);
   }
 

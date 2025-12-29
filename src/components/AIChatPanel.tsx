@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Send, Bot, Loader2, Sparkles } from 'lucide-react';
+import { X, Send, Bot, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { VideoContext } from '@/lib/ai-orchestrator';
@@ -26,13 +26,23 @@ export default function AIChatPanel({
   context,
   welcomeMessage = '你好！我是MoonTVPlus的AI影视助手，有什么可以帮你的吗？',
 }: AIChatPanelProps) {
+  // 生成sessionStorage的key，基于视频上下文
+  const getStorageKey = () => {
+    if (context?.title) {
+      return `ai-chat-${context.title}-${context.year || ''}-${context.type || ''}`;
+    }
+    return 'ai-chat-general';
+  };
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: welcomeMessage },
   ]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const contextKeyRef = useRef<string>(getStorageKey());
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -43,9 +53,59 @@ export default function AIChatPanel({
     scrollToBottom();
   }, [messages]);
 
+  // 从sessionStorage加载消息记录
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const storageKey = getStorageKey();
+    const savedMessages = sessionStorage.getItem(storageKey);
+
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch (error) {
+        console.error('加载聊天记录失败:', error);
+      }
+    }
+  }, []); // 只在组件挂载时加载一次
+
+  // 保存消息记录到sessionStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const storageKey = getStorageKey();
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages));
+    } catch (error) {
+      console.error('保存聊天记录失败:', error);
+    }
+  }, [messages, context]); // 消息变化时保存
+
+  // 检测VideoContext变化，清除旧的聊天记录
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const newKey = getStorageKey();
+    if (contextKeyRef.current !== newKey) {
+      // 上下文变化了，清除消息并重置为欢迎消息
+      console.log('视频上下文变化，清除聊天记录');
+      setMessages([{ role: 'assistant', content: welcomeMessage }]);
+      contextKeyRef.current = newKey;
+    }
+  }, [context, welcomeMessage]); // 监听context变化
+
   // 自动聚焦输入框和防止背景滚动
   useEffect(() => {
     if (isOpen) {
+      // 检测是否为移动设备
+      const checkMobile = () => {
+        setIsMobile(window.innerWidth < 768);
+      };
+      checkMobile();
+
       // 聚焦输入框
       if (inputRef.current) {
         inputRef.current.focus();
@@ -174,6 +234,20 @@ export default function AIChatPanel({
     }
   };
 
+  // 清空聊天上下文
+  const handleClearContext = () => {
+    if (typeof window === 'undefined') return;
+
+    // 清除sessionStorage
+    const storageKey = getStorageKey();
+    sessionStorage.removeItem(storageKey);
+
+    // 重置消息为欢迎消息
+    setMessages([{ role: 'assistant', content: welcomeMessage }]);
+
+    console.log('已清空聊天上下文');
+  };
+
   if (!isOpen) return null;
 
   const modalContent = (
@@ -289,12 +363,20 @@ export default function AIChatPanel({
         {/* 输入区域 */}
         <div className='border-t border-gray-200 p-4 dark:border-gray-700'>
           <div className='flex gap-2'>
+            <button
+              onClick={handleClearContext}
+              className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-gray-300 text-gray-500 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-800'
+              title='清空聊天记录'
+              disabled={isStreaming}
+            >
+              <Trash2 size={20} />
+            </button>
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder='输入你的问题... (Shift+Enter换行)'
+              placeholder={isMobile ? '输入你的问题...' : '输入你的问题... (Shift+Enter换行)'}
               disabled={isStreaming}
               rows={1}
               className='flex-1 resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500 dark:focus:border-purple-400'
