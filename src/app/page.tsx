@@ -159,7 +159,7 @@ function HomeClient() {
                 <div className='flex items-center justify-end mb-4'>
                   <button
                     onClick={() => setShowAIChat(true)}
-                    className='p-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600 transition-colors'
+                    className='p-2 rounded-lg text-purple-500 hover:text-purple-600 transition-colors'
                     title='AI问片'
                   >
                     <Bot size={20} />
