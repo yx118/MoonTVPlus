@@ -8771,29 +8771,6 @@ const XiaoyaConfigComponent = ({
           />
         </div>
 
-        <div className='flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700'>
-          <div>
-            <h3 className='text-sm font-medium text-gray-900 dark:text-white'>
-              禁用预览视频
-            </h3>
-            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
-              开启后将直接返回直连链接，不使用视频预览流
-            </p>
-          </div>
-          <button
-            onClick={() => setDisableVideoPreview(!disableVideoPreview)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              disableVideoPreview ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                disableVideoPreview ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
-
         <div className='grid grid-cols-2 gap-4'>
           <div>
             <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
@@ -8819,6 +8796,29 @@ const XiaoyaConfigComponent = ({
               className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'
             />
           </div>
+        </div>
+
+        <div className='flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700'>
+          <div>
+            <h3 className='text-sm font-medium text-gray-900 dark:text-white'>
+              禁用预览视频
+            </h3>
+            <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+              开启后将直接返回直连链接，不使用视频预览流
+            </p>
+          </div>
+          <button
+            onClick={() => setDisableVideoPreview(!disableVideoPreview)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              disableVideoPreview ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                disableVideoPreview ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
 
         <div className='flex gap-3'>
