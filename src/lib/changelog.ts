@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
 	{
+    version: '209.1.0',
+    date: '2026-01-21',
+	added: [
+		"增加禁用自动匹配弹幕",
+		"增加弹幕上限设置",
+		"增加禁用弹幕热力图开关"
+    ],
+    changed: [
+		"恢复无数据库支持",
+		"反爬增强"
+    ],
+    fixed: [
+		"修复订阅去广告开关不正确修改链接问题"
+	]
+	},
+	{
     version: '209.0.0',
     date: '2026-01-18',
 	added: [
