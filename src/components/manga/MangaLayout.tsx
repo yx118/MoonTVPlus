@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { BookOpen, ChevronLeft, History, Home, List, Search, Settings2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, Compass, History, List, Search, Settings2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 
@@ -14,12 +14,11 @@ interface MangaLayoutProps {
 }
 
 const sectionTabs = [
-  { href: '/manga', label: '搜索', icon: Search },
+  { href: '/manga', label: '推荐', icon: Compass },
+  { href: '/manga/search', label: '搜索', icon: Search },
   { href: '/manga/shelf', label: '书架', icon: BookOpen },
   { href: '/manga/history', label: '历史', icon: History },
 ];
-
-const bottomTabs = [{ href: '/', label: '首页', icon: Home }, ...sectionTabs];
 
 function getMeta(pathname: string, searchParams: ReturnType<typeof useSearchParams>) {
   if (pathname === '/manga/shelf') {
@@ -27,6 +26,9 @@ function getMeta(pathname: string, searchParams: ReturnType<typeof useSearchPara
   }
   if (pathname === '/manga/history') {
     return { title: '漫画历史', subtitle: '从上次阅读的位置继续' };
+  }
+  if (pathname === '/manga/search') {
+    return { title: '漫画搜索', subtitle: '按标题和来源搜索漫画' };
   }
   if (pathname === '/manga/detail') {
     return {
@@ -48,7 +50,7 @@ function getMeta(pathname: string, searchParams: ReturnType<typeof useSearchPara
       backHref: `/manga/detail?mangaId=${encodeURIComponent(mangaId)}&sourceId=${encodeURIComponent(sourceId)}&title=${encodeURIComponent(title)}&cover=${encodeURIComponent(cover)}&sourceName=${encodeURIComponent(sourceName)}&returnTo=${encodeURIComponent(returnTo)}`,
     };
   }
-  return { title: '漫画展馆', subtitle: '搜索漫画并加入书架' };
+  return { title: '漫画推荐', subtitle: '按来源查看热门与最新漫画' };
 }
 
 export default function MangaLayout({ children }: MangaLayoutProps) {
@@ -167,7 +169,7 @@ export default function MangaLayout({ children }: MangaLayoutProps) {
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className='mx-auto grid max-w-3xl grid-cols-4'>
-            {bottomTabs.map((tab) => {
+            {sectionTabs.map((tab) => {
               const Icon = tab.icon;
               const active = isActive(tab.href);
               return (

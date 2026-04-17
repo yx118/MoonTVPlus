@@ -4,6 +4,8 @@ import { getConfig } from './config';
 import {
   MangaChapter,
   MangaDetail,
+  MangaRecommendResult,
+  MangaRecommendType,
   MangaSearchItem,
   MangaSource,
 } from './manga.types';
@@ -214,6 +216,85 @@ export class SuwayomiClient {
     }
 
     return results;
+  }
+
+  async getRecommendedManga(
+    sourceId: string,
+    type: MangaRecommendType = 'POPULAR',
+    page = 1
+  ): Promise<MangaRecommendResult> {
+    if (!sourceId) {
+      return { mangas: [], hasNextPage: false };
+    }
+
+    const query = `
+      fragment MANGA_BASE_FIELDS on MangaType {
+        id
+        title
+        thumbnailUrl
+        sourceId
+        description
+        author
+        artist
+        genre
+        status
+      }
+
+      mutation GET_SOURCE_MANGAS_FETCH($input: FetchSourceMangaInput!) {
+        fetchSourceManga(input: $input) {
+          hasNextPage
+          mangas {
+            ...MANGA_BASE_FIELDS
+          }
+        }
+      }
+    `;
+
+    const sources = await this.getSources();
+    const matchedSource = sources.find((item) => item.id === sourceId);
+
+    const data = await this.graphqlRequest<{
+      fetchSourceManga?: {
+        hasNextPage?: boolean;
+        mangas?: Array<{
+          id: string | number;
+          title?: string;
+          thumbnailUrl?: string;
+          sourceId?: string | number;
+          description?: string;
+          author?: string;
+          artist?: string;
+          genre?: string;
+          status?: string;
+        }>;
+      };
+    }>(
+      query,
+      {
+        input: {
+          type,
+          source: sourceId,
+          page,
+        },
+      },
+      'GET_SOURCE_MANGAS_FETCH'
+    );
+
+    return {
+      hasNextPage: Boolean(data.fetchSourceManga?.hasNextPage),
+      mangas: (data.fetchSourceManga?.mangas || []).map((manga) => ({
+        id: String(manga.id),
+        sourceId: String(manga.sourceId || sourceId),
+        sourceName: matchedSource?.displayName || matchedSource?.name || sourceId,
+        title: manga.title || '未命名漫画',
+        cover: buildSuwayomiImageProxyUrl(manga.thumbnailUrl || ''),
+        description: manga.description,
+        author: manga.author,
+        artist: manga.artist,
+        genre: manga.genre,
+        status: manga.status,
+      })),
+    };
   }
 
   async getChapters(mangaId: string): Promise<MangaChapter[]> {

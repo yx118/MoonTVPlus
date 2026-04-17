@@ -18,6 +18,13 @@ export interface MangaSearchItem {
   genre?: string;
 }
 
+export type MangaRecommendType = 'POPULAR' | 'LATEST';
+
+export interface MangaRecommendResult {
+  mangas: MangaSearchItem[];
+  hasNextPage: boolean;
+}
+
 export interface MangaChapter {
   id: string;
   mangaId: string;

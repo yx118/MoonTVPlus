@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const tabs = [
-  { href: '/manga', label: '搜索' },
+  { href: '/manga', label: '推荐' },
+  { href: '/manga/search', label: '搜索' },
   { href: '/manga/shelf', label: '书架' },
   { href: '/manga/history', label: '历史' },
 ];
